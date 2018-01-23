@@ -1,17 +1,54 @@
 module PMEval where
 
 import PMParser
+import Text.Parsec
+import Data.Hashable (hash)
 
 -- next two structures are used by parser
-optsE = undefined -- for expressions
-optsP = undefined -- for patterns
+
+optsE :: Ops Expr
+optsE = TermConstruction -- for expressions
+  { int = const Const
+  , tag = const Tag
+  , var = const Var
+  , field = const Field
+  , binop = BinOp
+  , econstr = const Constr
+  , ifthenelse = const IfThenElse
+  }
+
+optsP :: PattOps Patt
+optsP = PattConstruction
+  { wild = const Wild
+  , pconstr = const Pconstr
+  , named = const Named
+  , pconst = const Pconst
+  } -- for patterns
 
 data EvalRez =
-    OK Int           -- success
+  OK Int           -- success
   | BadProgram       -- adding integers to functions, getting tag of integer,
                      -- unbound variables, etc.
   | PMatchFail       -- patterns are not exhaustive.
   deriving (Show,Eq)
+
+
+data Expr = 
+  Const Int
+  | Tag Expr
+  | Var String
+  | Field Int Expr
+  | BinOp BinOpSort Expr Expr
+  | Constr String [Expr]
+  | IfThenElse Expr Expr Expr
+  deriving Show
+
+data Patt =
+  Wild
+  | Pconstr String [Patt]
+  | Named String
+  | Pconst Int
+  deriving Show
 
 
 -- implement this function :: expr -> [(pattern,expr)] -> EvalRez
@@ -24,7 +61,43 @@ data EvalRez =
 --      should fail with PMatchFail because pattern matching is not exhaustive.
 
 -- For examples about which expression and patterns can be written see tests file.
-eval what cases = OK 42
+eval :: Expr -> [(Patt, Expr)] -> EvalRez
+eval _ [] = PMatchFail
+eval what (c:cs) = case match what c of
+  PMatchFail -> eval what cs
+  other -> other
+  where
+    match ::  Expr -> (Patt, Expr) -> EvalRez
+    match x (Wild, e) = describe $ reduce x (Wild, e)
+    match (Const x) (w, e) = case w of 
+      Pconst x' -> if x == x' then describe $ reduce (Const x) (w, e) else PMatchFail
+      Named x' -> describe $ reduce (Const x) (w, e)
+      Pconstr _ _ -> PMatchFail
+    match _ _ = PMatchFail
+    
+    reduce :: Expr -> (Patt, Expr) -> Expr
+    reduce _ (Wild, e) = case e of
+      Const x -> Const x
+      Tag (Constr x _) -> Const $ hash x
+      Var x -> Var x
+      Field x c@(Constr _ args) -> case lookup' args x of
+        Just e -> reduce (Const 0) (Wild, e)
+        Nothing -> Field x c
+      -- BinOp 
 
+    stepReduce :: Expr -> Maybe Expr
+    stepReduce _ = Nothing
 
+    whileJust :: Expr -> Expr
+    whileJust e = case stepReduce e of
+      Nothing -> e
+      (Just e') -> whileJust e'
 
+    describe :: Expr -> EvalRez
+    describe (Const x) = OK x
+    describe _ = BadProgram
+
+lookup' :: [a] -> Int -> Maybe a
+lookup' [] _ = Nothing
+lookup' (a:as) 0 = Just a
+lookup' (a:as) n = lookup' as (n - 1)
