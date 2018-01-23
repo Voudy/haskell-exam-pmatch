@@ -64,21 +64,27 @@ data Patt =
 -- For examples about which expression and patterns can be written see tests file.
 eval :: Expr -> [(Patt, Expr)] -> EvalRez
 eval _ [] = PMatchFail
-eval what (c:cs) = case match what' c of
-  PMatchFail -> eval what' cs
-  other -> other
+eval what ((p, e):cs) = case checkForMatch what' p of
+  False -> eval what' cs
+  True -> match what' (p, e)
   where
     what' = reduce (Const 0) (Wild, what)
 
     match ::  Expr -> (Patt, Expr) -> EvalRez
     match _ (Wild, e) = describe $ reduce (Const 0) (Wild, e)
-    match (Const x) (w, e) = case w of 
-      Pconst x' -> if x == x' then describe $ reduce (Const 0) (w, e) else PMatchFail
-      Named x' -> describe $ reduce (Const x) (w, e)
-      Pconstr _ _ -> PMatchFail
     match x (Named x', e) = describe $ reduce x (Named x', e)
+    match (Const _) (Pconst _, e) = describe $ reduce (Const 0) (Wild, e)
+    match e@(Constr _ _) p@(Pconstr _ _, _) = describe $ reduce e p
     match _ _ = PMatchFail
-    
+   
+    checkForMatch :: Expr -> Patt -> Bool
+    checkForMatch _ Wild = True
+    checkForMatch _ (Named _) = True
+    checkForMatch (Const x) (Pconst y) = x == y
+    checkForMatch (Constr name1 args1) (Pconstr name2 args2) = name1 == name2
+                                                                && length args1 == length args2
+                                                                && all (uncurry checkForMatch) (zip args1 args2)
+
     reduce :: Expr -> (Patt, Expr) -> Expr
     reduce _ (Wild, e) = case e of
       Const x                   -> Const x
@@ -108,6 +114,14 @@ eval what (c:cs) = case match what' c of
       (IfThenElse cond t e)     -> reduce (Const 0) (Wild, IfThenElse (reduce exprL (Named x, cond))
                                                     (reduce exprL (Named x, t)) (reduce exprL (Named x, e)))
 
+    reduce e (Pconst _, exp) = reduce (Const 0) (Wild, exp)
+
+    reduce exp@(Constr ename eargs) patt@(Pconstr pname pargs, e) = reduceRec exp patt
+      where
+        reduceRec (Constr _ []) (Pconstr _ [], e') = reduce (Const 0) (Wild, e')
+        reduceRec (Constr en (ea:eas)) (Pconstr pn (pa:pas), e') =
+          reduce (Constr en eas) (Pconstr pn pas, reduce ea (pa,e'))
+
     stepReduce :: Expr -> Maybe Expr
     stepReduce _ = Nothing
 
@@ -126,9 +140,9 @@ lookup' (a:as) 0 = Just a
 lookup' (a:as) n = lookup' as (n - 1)
 
 operation :: BinOpSort -> Int -> Int -> Expr
-operation Mul x y = Const $ x * y
-operation Add x y = Const $ x + y
-operation Sub x y = Const $ x - y
-operation Eq x y = Bool $ x == y
-operation LessThen x y = Bool $ x < y
-operation LessEq x y = Bool $ x <= y
+operation Mul x y       = Const $ x * y
+operation Add x y       = Const $ x + y
+operation Sub x y       = Const $ x - y
+operation Eq x y        = Bool $ x == y
+operation LessThen x y  = Bool $ x < y
+operation LessEq x y    = Bool $ x <= y
