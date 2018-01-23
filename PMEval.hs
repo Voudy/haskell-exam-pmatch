@@ -93,6 +93,16 @@ eval what (c:cs) = case match what c of
         Bool False -> reduce (Const 0) (Wild, el)
         _ -> IfThenElse cond th el
       Bool x -> Bool x
+    reduce exprL (Named x, expr) = case expr of   
+      (Const y) -> reduce (Const 0) (Wild, Const y)
+      (Var y) -> reduce (Const 0) (Wild, if x == y then exprL else (Var y))
+      (Tag y) -> reduce (Const 0) (Wild, Tag $ reduce exprL (Named x, y))
+      (BinOp b e1 e2) -> reduce (Const 0) 
+                    (Wild, BinOp b (reduce exprL (Named x, e1)) (reduce exprL (Named x, e2)))
+      (Field i e) -> Field i (reduce exprL (Named x, e))
+      (Constr name es) -> Constr name $ map (\e -> (reduce exprL (Named x, e))) es
+      (IfThenElse cond t e) -> IfThenElse (reduce exprL (Named x, cond))
+                                                    (reduce exprL (Named x, t)) (reduce exprL (Named x, e))
 
     stepReduce :: Expr -> Maybe Expr
     stepReduce _ = Nothing
