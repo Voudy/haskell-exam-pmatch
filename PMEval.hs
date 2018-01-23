@@ -5,6 +5,7 @@ import Text.Parsec
 import Data.Hashable (hash)
 
 -- next two structures are used by parser
+<<<<<<< HEAD
 
 optsE :: Ops Expr
 optsE = TermConstruction -- for expressions
@@ -24,6 +25,10 @@ optsP = PattConstruction
   , named = const Named
   , pconst = const Pconst
   } -- for patterns
+=======
+-- optsE = undefined -- for expressions
+-- optsP = undefined -- for patterns
+>>>>>>> e3e0cdc4a753eee3c35da95e1948c8236837346a
 
 data EvalRez =
   OK Int           -- success

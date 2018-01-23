@@ -13,6 +13,7 @@ wrap name what casesS expected =
   where
     w = PMParser.parseScrutinee optsE what
     c1 = TestCase (assertBool "parsable" (isRight w))
+    (_,[scrutinee]) = partitionEithers [w]
     cases = map (PMParser.parseCase optsP optsE) casesS
     c2 = map (\r -> TestCase (assertBool "case is parsable" (isRight r)) ) cases
     (_,cases2) = partitionEithers cases
