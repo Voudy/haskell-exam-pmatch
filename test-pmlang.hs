@@ -13,11 +13,12 @@ wrap name what casesS expected =
   where
     w = PMParser.parseScrutinee optsE what
     c1 = TestCase (assertBool "parsable" (isRight w))
+    (_,[scrutinee]) = partitionEithers [w]
     cases = map (PMParser.parseCase optsP optsE) casesS
     c2 = map (\r -> TestCase (assertBool "case is parsable" (isRight r)) ) cases
     (_,cases2) = partitionEithers cases
     c3 = TestCase (assertEqual "evaluated correctly"
-                      expected (PMEval.eval w cases))
+                      expected (PMEval.eval scrutinee cases2))
 
 -- mistakes in syntax can be here. Please report the ones.
 tests = TestList

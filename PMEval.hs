@@ -3,8 +3,8 @@ module PMEval where
 import PMParser
 
 -- next two structures are used by parser
-optsE = undefined -- for expressions
-optsP = undefined -- for patterns
+-- optsE = undefined -- for expressions
+-- optsP = undefined -- for patterns
 
 data EvalRez =
     OK Int           -- success
@@ -24,7 +24,13 @@ data EvalRez =
 --      should fail with PMatchFail because pattern matching is not exhaustive.
 
 -- For examples about which expression and patterns can be written see tests file.
+--eval what cases = OK 42
+
+
+optsE = undefined
+optsP = undefined
+
+
+-- implement this with following signature
+--eval :: Expr -> [(Patt,Expr)] -> EvalRez
 eval what cases = OK 42
-
-
-
