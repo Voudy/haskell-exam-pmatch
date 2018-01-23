@@ -41,6 +41,7 @@ data Expr =
   | BinOp BinOpSort Expr Expr
   | Constr String [Expr]
   | IfThenElse Expr Expr Expr
+  | Bool Bool
   deriving Show
 
 data Patt =
@@ -83,7 +84,15 @@ eval what (c:cs) = case match what c of
       Field x c@(Constr _ args) -> case lookup' args x of
         Just e -> reduce (Const 0) (Wild, e)
         Nothing -> Field x c
-      -- BinOp 
+      BinOp znak exp1 exp2 -> case (reduce (Const 0) (Wild, exp1), reduce (Const 0) (Wild, exp2)) of
+        (Const num1, Const num2) -> operation znak num1 num2
+        (_, _) -> BinOp znak exp1 exp2
+      Constr name args -> Constr name $ map (\x -> reduce (Const 0) (Wild, x)) args
+      IfThenElse cond th el -> case reduce (Const 0) (Wild, cond) of
+        Bool True -> reduce (Const 0) (Wild, th)
+        Bool False -> reduce (Const 0) (Wild, el)
+        _ -> IfThenElse cond th el
+      Bool x -> Bool x
 
     stepReduce :: Expr -> Maybe Expr
     stepReduce _ = Nothing
@@ -101,3 +110,11 @@ lookup' :: [a] -> Int -> Maybe a
 lookup' [] _ = Nothing
 lookup' (a:as) 0 = Just a
 lookup' (a:as) n = lookup' as (n - 1)
+
+operation :: BinOpSort -> Int -> Int -> Expr
+operation Mul x y = Const $ x * y
+operation Add x y = Const $ x + y
+operation Sub x y = Const $ x - y
+operation Eq x y = Bool $ x == y
+operation LessThen x y = Bool $ x < y
+operation LessEq x y = Bool $ x <= y
