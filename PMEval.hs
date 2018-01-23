@@ -64,45 +64,49 @@ data Patt =
 -- For examples about which expression and patterns can be written see tests file.
 eval :: Expr -> [(Patt, Expr)] -> EvalRez
 eval _ [] = PMatchFail
-eval what (c:cs) = case match what c of
-  PMatchFail -> eval what cs
+eval what (c:cs) = case match what' c of
+  PMatchFail -> eval what' cs
   other -> other
   where
+    what' = reduce (Const 0) (Wild, what)
+
     match ::  Expr -> (Patt, Expr) -> EvalRez
-    match x (Wild, e) = describe $ reduce x (Wild, e)
+    match _ (Wild, e) = describe $ reduce (Const 0) (Wild, e)
     match (Const x) (w, e) = case w of 
-      Pconst x' -> if x == x' then describe $ reduce (Const x) (w, e) else PMatchFail
+      Pconst x' -> if x == x' then describe $ reduce (Const 0) (w, e) else PMatchFail
       Named x' -> describe $ reduce (Const x) (w, e)
       Pconstr _ _ -> PMatchFail
+    match x (Named x', e) = describe $ reduce x (Named x', e)
     match _ _ = PMatchFail
     
     reduce :: Expr -> (Patt, Expr) -> Expr
     reduce _ (Wild, e) = case e of
-      Const x -> Const x
-      Tag (Constr x _) -> Const $ hash x
-      Var x -> Var x
+      Const x                   -> Const x
+      Tag (Constr x _)          -> Const $ hash x
+      Var x                     -> Var x
       Field x c@(Constr _ args) -> case lookup' args x of
-        Just e -> reduce (Const 0) (Wild, e)
-        Nothing -> Field x c
-      BinOp znak exp1 exp2 -> case (reduce (Const 0) (Wild, exp1), reduce (Const 0) (Wild, exp2)) of
-        (Const num1, Const num2) -> operation znak num1 num2
-        (_, _) -> BinOp znak exp1 exp2
-      Constr name args -> Constr name $ map (\x -> reduce (Const 0) (Wild, x)) args
-      IfThenElse cond th el -> case reduce (Const 0) (Wild, cond) of
-        Bool True -> reduce (Const 0) (Wild, th)
-        Bool False -> reduce (Const 0) (Wild, el)
-        _ -> IfThenElse cond th el
-      Bool x -> Bool x
+        Just e    -> reduce (Const 0) (Wild, e)
+        Nothing   -> Field x c
+      BinOp znak exp1 exp2      -> case (reduce (Const 0) (Wild, exp1), reduce (Const 0) (Wild, exp2)) of
+        (Const num1, Const num2)    -> operation znak num1 num2
+        (_, _)                      -> BinOp znak exp1 exp2
+      Constr name args          -> Constr name $ map (\x -> reduce (Const 0) (Wild, x)) args
+      IfThenElse cond th el     -> case reduce (Const 0) (Wild, cond) of
+        Bool True   -> reduce (Const 0) (Wild, th)
+        Bool False  -> reduce (Const 0) (Wild, el)
+        _           -> IfThenElse cond th el
+      Bool x                    -> Bool x
+
     reduce exprL (Named x, expr) = case expr of   
-      (Const y) -> reduce (Const 0) (Wild, Const y)
-      (Var y) -> reduce (Const 0) (Wild, if x == y then exprL else (Var y))
-      (Tag y) -> reduce (Const 0) (Wild, Tag $ reduce exprL (Named x, y))
-      (BinOp b e1 e2) -> reduce (Const 0) 
+      (Const y)                 -> Const y
+      (Var y)                   -> if x == y then reduce (Const 0) (Wild, exprL) else (Var y)
+      (Tag y)                   -> reduce (Const 0) (Wild, Tag $ reduce exprL (Named x, y))
+      (BinOp b e1 e2)           -> reduce (Const 0) 
                     (Wild, BinOp b (reduce exprL (Named x, e1)) (reduce exprL (Named x, e2)))
-      (Field i e) -> Field i (reduce exprL (Named x, e))
-      (Constr name es) -> Constr name $ map (\e -> (reduce exprL (Named x, e))) es
-      (IfThenElse cond t e) -> IfThenElse (reduce exprL (Named x, cond))
-                                                    (reduce exprL (Named x, t)) (reduce exprL (Named x, e))
+      (Field i e)               -> reduce (Const 0) (Wild, Field i (reduce exprL (Named x, e)))
+      (Constr name es)          -> reduce (Const 0) (Wild, Constr name $ map (\e -> (reduce exprL (Named x, e))) es)
+      (IfThenElse cond t e)     -> reduce (Const 0) (Wild, IfThenElse (reduce exprL (Named x, cond))
+                                                    (reduce exprL (Named x, t)) (reduce exprL (Named x, e)))
 
     stepReduce :: Expr -> Maybe Expr
     stepReduce _ = Nothing
