@@ -84,11 +84,13 @@ eval what ((p, e):cs) = case checkForMatch what' p of
     checkForMatch (Constr name1 args1) (Pconstr name2 args2) = name1 == name2
                                                                 && length args1 == length args2
                                                                 && all (uncurry checkForMatch) (zip args1 args2)
+    checkForMatch _ _ = False
 
     reduce :: Expr -> (Patt, Expr) -> Expr
     reduce _ (Wild, e) = case e of
       Const x                   -> Const x
       Tag (Constr x _)          -> Const $ hash x
+      Tag x                     -> Tag x
       Var x                     -> Var x
       Field x c@(Constr _ args) -> case lookup' args x of
         Just e    -> reduce (Const 0) (Wild, e)
